@@ -44,19 +44,19 @@ each `vX.Y.Z` tag. To install on another machine, `pip install` the matching
 release asset directly (public repo — no token needed):
 
 ```bash
-# pick the line for your platform; replace <owner> and the version
+# pick the line for your platform (bump the version to match the release tag)
 # Linux x86_64
-pip install https://github.com/<owner>/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-manylinux2014_x86_64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-manylinux2014_x86_64.whl
 # Linux aarch64 (Raspberry Pi 4/5, Jetson, …)
-pip install https://github.com/<owner>/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-manylinux2014_aarch64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-manylinux2014_aarch64.whl
 # Windows x86_64  (install Npcap first: https://npcap.com)
-pip install https://github.com/<owner>/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-win_amd64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.0/openpowerlink-0.1.0-py3-none-win_amd64.whl
 ```
 
 Or grab the latest without hardcoding the version (needs the GitHub CLI):
 
 ```bash
-gh release download --repo <owner>/openpowerlink-py --pattern '*manylinux2014_x86_64.whl'
+gh release download --repo oe7set/openpowerlink-py --pattern '*manylinux2014_x86_64.whl'
 pip install ./openpowerlink-*.whl
 ```
 
@@ -116,17 +116,18 @@ python scripts/build_wheels.py
 
 `.github/workflows/wheels.yml` builds all three platform wheels and publishes
 them as GitHub Release assets. The openPOWERLINK C source comes from **your fork**
-(`env.OPLK_REPO` = `<owner>/openPOWERLINK_V2`, pinned to `env.OPLK_REF` = `V2.7.2`)
-— no upstream repo is referenced.
+(`env.OPLK_REPO` = `oe7set/openPOWERLINK_V2`), pinned to the exact **V2.7.2 commit
+SHA** in `env.OPLK_REF` — no upstream repo is referenced.
 
-One-time setup, then cut a release:
+> Note: forking on GitHub does **not** copy tags, so the workflow pins the commit
+> SHA (`048650a8…`, upstream tag `V2.7.2`) rather than the tag name. To use a
+> different revision, either push that tag to your fork and set `OPLK_REF` to it,
+> or update the SHA.
+
+Cut a release:
 
 ```bash
-# 1) On GitHub, fork OpenAutomationTechnologies/openPOWERLINK_V2 into your account.
-# 2) Create a public repo for this package and push it:
-git remote add origin https://github.com/<owner>/openpowerlink-py.git
-git push -u origin HEAD
-# 3) Tag to trigger the build + release (version is derived from the tag):
+# Trigger the build + release (the wheel version is derived from the tag):
 git tag v0.1.0
 git push origin v0.1.0
 ```

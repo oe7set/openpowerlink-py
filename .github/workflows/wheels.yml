@@ -14,11 +14,13 @@ on:
   workflow_dispatch:
 
 # The openPOWERLINK C source is taken from YOUR fork (no upstream repo referenced).
-# Fork OpenAutomationTechnologies/openPOWERLINK_V2 into this account once; these
-# two values are the only knobs.
+# NOTE: forking on GitHub does NOT copy tags, so we pin the exact V2.7.2 commit
+# SHA (reachable in the fork's history) instead of the tag `V2.7.2`. To move to a
+# different revision, push that tag to your fork and set OPLK_REF to it, or update
+# this SHA.
 env:
-  OPLK_REPO: ${{ github.repository_owner }}/openPOWERLINK_V2
-  OPLK_REF: V2.7.2
+  OPLK_REPO: oe7set/openPOWERLINK_V2
+  OPLK_REF: 048650a80db37fa372330c3a900d2c8edb327e47   # == upstream tag V2.7.2
 
 permissions:
   contents: write            # needed by the release job to upload assets
