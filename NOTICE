@@ -1,0 +1,24 @@
+openpowerlink (Python package)
+==============================
+
+This package bundles compiled binaries of the openPOWERLINK protocol stack.
+
+openPOWERLINK
+-------------
+Copyright (c) B&R Industrial Automation GmbH and openPOWERLINK contributors.
+openPOWERLINK is distributed under the BSD 2-Clause License; some
+target/hardware-specific components are licensed under GPLv2. See the
+openPOWERLINK source distribution (openPOWERLINK_V2) for the full license texts.
+
+The bundled shared libraries (liboplkmn/oplkmn) are built from the openPOWERLINK
+"complete MN" library using the userspace Ethernet driver (raw PF_PACKET sockets
+on Linux; Npcap/WinPcap on Windows).
+
+Npcap (Windows only)
+--------------------
+The Windows build links against the WinPcap-compatible Npcap SDK for compilation.
+The Npcap runtime is NOT redistributed with this package; users must install it
+separately from https://npcap.com under its own license.
+
+This package's own code (the oplkwrap shim and the Python layer) is licensed
+under the BSD 2-Clause License.

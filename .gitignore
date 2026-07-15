@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Native build trees (binaries are bundled into _native/, build dirs are not)
+/native/oplkwrap/build/
+/native/oplkwrap/build_win/
+/build_stack/
+*.o
+*.obj
+
+# The bundled native binaries are produced by scripts/ and committed per
+# platform under src/openpowerlink/_native/<plat>/. Keep the dirs, ignore stray
+# object files only (handled above).
