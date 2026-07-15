@@ -99,6 +99,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Staging the freshly built binaries over the committed ones makes the Git
+      # tree "dirty", so hatch-vcs would otherwise ignore the tag and emit a
+      # 0.1.1.dev0+g<hash>.d<date> version. On a tag build, pin the version to the
+      # tag (strip the leading "v") so the wheel is named exactly 0.1.0, etc.
+      - name: Pin version from tag (release builds)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "SETUPTOOLS_SCM_PRETEND_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Build wheel
         run: |
           python -m pip install --upgrade build
@@ -156,6 +164,15 @@ jobs:
           .\scripts\build_windows.ps1 `
             -OplkBaseDir "$env:GITHUB_WORKSPACE\openPOWERLINK_V2" `
             -CMakeExe "$env:CMAKE_EXE"
+
+      # See the Linux job: staging binaries dirties the tree, so pin the version
+      # to the tag on release builds to get an exact 0.1.0-style wheel name.
+      - name: Pin version from tag (release builds)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          "SETUPTOOLS_SCM_PRETEND_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build wheel
         shell: pwsh
