@@ -14,13 +14,18 @@ on:
   workflow_dispatch:
 
 # The openPOWERLINK C source is taken from YOUR fork (no upstream repo referenced).
-# NOTE: forking on GitHub does NOT copy tags, so we pin the exact V2.7.2 commit
-# SHA (reachable in the fork's history) instead of the tag `V2.7.2`. To move to a
-# different revision, push that tag to your fork and set OPLK_REF to it, or update
-# this SHA.
+# NOTE: forking on GitHub does NOT copy tags, so we pin an exact commit SHA
+# (reachable in the fork's history) instead of a tag. To move to a different
+# revision, push it to your fork and update this SHA.
+#
+# This SHA is V2.7.2 (upstream 048650a8) plus the fork's Linux-userspace runtime
+# fixes on branch `rt-tolerant-hrestimer`:
+#   - hrestimer-posix: don't abort init when RT scheduling is unavailable
+#   - posix shm/sem: owner-writable perms + unlink circbuf sem on free
+#     (fixes plw_init 0x0008 / kErrorNoResource on unprivileged or reused runs)
 env:
   OPLK_REPO: oe7set/openPOWERLINK_V2
-  OPLK_REF: 048650a80db37fa372330c3a900d2c8edb327e47   # == upstream tag V2.7.2
+  OPLK_REF: 6bf9345b4810d2951bc81c7daf35675f04b439d6   # V2.7.2 + Linux runtime fixes
 
 permissions:
   contents: write            # needed by the release job to upload assets

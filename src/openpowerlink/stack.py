@@ -16,12 +16,38 @@ writes.
 from __future__ import annotations
 
 import ctypes
+import os
+import sys
 import threading
 import time
+import warnings
 from pathlib import Path
 
 from openpowerlink import _loader, _wrap
 from openpowerlink.xap import Channel, ChannelKind, ProcessImage, parse_xap
+
+
+def _realtime_available() -> bool:
+    """True if this process can use real-time (SCHED_FIFO) scheduling.
+
+    POWERLINK's cycle timing relies on a real-time timer thread. It needs either
+    root or a non-zero ``RLIMIT_RTPRIO``. Non-Linux and unknown cases return True
+    (no warning) — the check is a best-effort heuristic for the common Linux
+    "ran unprivileged / under WSL" pitfall.
+    """
+    if sys.platform != "linux":
+        return True
+    try:
+        if os.geteuid() == 0:            # root can always set SCHED_FIFO
+            return True
+    except AttributeError:
+        return True
+    try:
+        import resource
+        soft, _hard = resource.getrlimit(resource.RLIMIT_RTPRIO)
+        return soft != 0
+    except (ImportError, ValueError, OSError):
+        return True                      # can't tell -> stay quiet
 
 
 class StackError(RuntimeError):
@@ -68,6 +94,15 @@ class PowerlinkStack:
         """Initialise, configure and start the stack + supervisor thread."""
         if self._started:
             return
+
+        if not _realtime_available():
+            warnings.warn(
+                "openPOWERLINK is running WITHOUT real-time scheduling "
+                "(no root / RLIMIT_RTPRIO == 0). The stack will still run, but "
+                "cycle timing has higher jitter — for testing only, not for "
+                "hard real-time production. Run as root or grant "
+                "cap_net_raw,cap_net_admin,cap_sys_nice and a non-zero RT limit.",
+                RuntimeWarning, stacklevel=2)
 
         mac = (ctypes.c_uint8 * 6)()          # all-zero => use the NIC's real MAC
         _check("plw_init", self._lib.plw_init(

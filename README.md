@@ -82,6 +82,25 @@ Userspace raw Ethernet needs elevated privileges and a dedicated POWERLINK NIC:
 
 Use a NIC dedicated to POWERLINK (the stack takes over raw frames on it).
 
+### Troubleshooting: `plw_init failed (oplk error 0x0008)`
+
+`0x0008` is `kErrorNoResource` and, on Linux, almost always means the stack
+could not (re)create its POSIX IPC objects in `/dev/shm`. The usual cause is
+**mixed privileges**: an earlier run as `root` (e.g. via `sudo`) left
+`sem.semUserEvent`, `sem.semKernelEvent`, `sem.semCircbuf-*` and `shmCircbuf-*`
+owned by `root`, and a later unprivileged run cannot reopen or unlink them
+(`/dev/shm` is sticky, so a non-owner cannot remove them).
+
+* **Fix / avoid it:** run the stack **consistently as root** (raw Ethernet needs
+  it anyway) so it owns and cleans up its own objects. The bundled stack now
+  creates these objects owner-writable and unlinks them on clean shutdown, so
+  same-user reruns no longer collide.
+* **One-time cleanup** of stale root-owned leftovers from an earlier run:
+  ```bash
+  sudo rm -f /dev/shm/sem.semUserEvent /dev/shm/sem.semKernelEvent \
+             /dev/shm/sem.semCircbuf-* /dev/shm/shmCircbuf-*
+  ```
+
 ## CLI
 
 ```bash
