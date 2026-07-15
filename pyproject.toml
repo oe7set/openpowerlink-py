@@ -3,7 +3,10 @@
 # pre-installed to talk to B&R POWERLINK peripherals from userspace.
 [project]
 name = "openpowerlink"
-version = "0.1.0"
+# Version is derived from the Git tag by hatch-vcs (see [tool.hatch.version]),
+# so a `vX.Y.Z` tag produces matching wheel filenames. Untagged builds get a
+# dev version like 0.1.0.devN+g<hash>.
+dynamic = ["version"]
 description = "Self-contained openPOWERLINK userspace MN stack for Python (bundled native binaries)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,13 +24,22 @@ dev = ["pytest>=8.0"]
 pl = "openpowerlink.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+# Derive the package version from the Git tag (e.g. tag v0.2.0 -> 0.2.0).
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/openpowerlink"]
 # The bundled native binaries (*.so/*.dll) are data files inside the package.
 artifacts = ["src/openpowerlink/_native/**/*"]
+
+# Write the resolved version into the package so `openpowerlink.__version__`
+# works from the installed wheel (no import-time Git dependency).
+[tool.hatch.build.hooks.vcs]
+version-file = "src/openpowerlink/_version.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

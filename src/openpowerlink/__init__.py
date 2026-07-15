@@ -18,5 +18,10 @@ High-level use::
 from openpowerlink.api import PowerlinkIO, Status
 from openpowerlink.stack import PowerlinkStack, StackError
 
-__version__ = "0.1.0"
+try:
+    # Written by hatch-vcs at build time (see pyproject.toml).
+    from openpowerlink._version import __version__
+except ImportError:  # running from a source checkout without a build
+    __version__ = "0.0.0.dev0"
+
 __all__ = ["PowerlinkStack", "PowerlinkIO", "Status", "StackError"]

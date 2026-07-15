@@ -1,0 +1,193 @@
+name: wheels
+
+# Build the platform wheels (linux_x86_64, linux_aarch64, windows_amd64) that
+# bundle the compiled openPOWERLINK MN userspace stack, and — on a vX.Y.Z tag —
+# publish them as GitHub Release assets so another machine can install with a
+# plain `pip install <release-asset-url>`.
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# The openPOWERLINK C source is taken from YOUR fork (no upstream repo referenced).
+# Fork OpenAutomationTechnologies/openPOWERLINK_V2 into this account once; these
+# two values are the only knobs.
+env:
+  OPLK_REPO: ${{ github.repository_owner }}/openPOWERLINK_V2
+  OPLK_REF: V2.7.2
+
+permissions:
+  contents: write            # needed by the release job to upload assets
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  # Never interrupt a tag (release) build; cancel superseded branch/PR builds.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build-linux:
+    name: linux-${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            platform_tag: linux_x86_64
+            docker_platform: linux/amd64
+            image: quay.io/pypa/manylinux2014_x86_64
+            qemu: false
+          - arch: aarch64
+            platform_tag: linux_aarch64
+            docker_platform: linux/arm64
+            image: quay.io/pypa/manylinux2014_aarch64
+            qemu: true
+    steps:
+      - name: Checkout openpowerlink-py
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # hatch-vcs needs tags/history for the version
+
+      - name: Checkout openPOWERLINK_V2 fork
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPLK_REPO }}
+          ref: ${{ env.OPLK_REF }}
+          path: openPOWERLINK_V2
+
+      # aarch64 is built in an arm64 manylinux image under QEMU emulation.
+      # (If native ARM runners become available, switch runs-on to ubuntu-24.04-arm
+      #  and drop this step for a large speedup.)
+      - name: Set up QEMU (arm64 only)
+        if: ${{ matrix.qemu }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build native binaries in manylinux2014
+        run: |
+          mkdir -p out
+          docker run --rm \
+            --platform ${{ matrix.docker_platform }} \
+            -v "${{ github.workspace }}/openPOWERLINK_V2":/src:ro \
+            -v "${{ github.workspace }}":/pkg \
+            -v "${{ github.workspace }}/out":/out \
+            ${{ matrix.image }} \
+            bash /pkg/scripts/build_in_container.sh
+
+      # The container script writes to /out; stage the binaries into the package
+      # so the wheel bundles the freshly built libraries.
+      - name: Stage binaries into _native/${{ matrix.platform_tag }}
+        run: |
+          dest="src/openpowerlink/_native/${{ matrix.platform_tag }}"
+          mkdir -p "$dest"
+          cp -v out/liboplkmn.so out/liboplkwrap.so "$dest/"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade build
+          python scripts/build_wheels.py ${{ matrix.platform_tag }}
+
+      - name: Verify wheel platform tag
+        run: |
+          ls -l dist/
+          case "${{ matrix.platform_tag }}" in
+            linux_x86_64)  want=manylinux2014_x86_64 ;;
+            linux_aarch64) want=manylinux2014_aarch64 ;;
+          esac
+          ls dist/openpowerlink-*-"$want".whl >/dev/null
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.platform_tag }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  build-windows:
+    name: windows-amd64
+    runs-on: windows-2022
+    steps:
+      - name: Checkout openpowerlink-py
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout openPOWERLINK_V2 fork
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPLK_REPO }}
+          ref: ${{ env.OPLK_REF }}
+          path: openPOWERLINK_V2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CMake 3.x + build backend
+        shell: pwsh
+        run: |
+          # The vendored stack sets CMP0043 OLD, rejected by CMake >= 4.0; pin 3.x.
+          python -m pip install --upgrade "cmake==3.22.6" build
+          $cm = python -c "import cmake, os; print(os.path.join(os.path.dirname(cmake.__file__),'data','bin','cmake.exe'))"
+          "CMAKE_EXE=$cm" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $cm --version
+
+      - name: Build native DLLs (MSVC + bundled WinPcap SDK)
+        shell: pwsh
+        run: |
+          .\scripts\build_windows.ps1 `
+            -OplkBaseDir "$env:GITHUB_WORKSPACE\openPOWERLINK_V2" `
+            -CMakeExe "$env:CMAKE_EXE"
+
+      - name: Build wheel
+        shell: pwsh
+        run: python scripts/build_wheels.py windows_amd64
+
+      - name: Verify wheel platform tag
+        shell: pwsh
+        run: |
+          Get-ChildItem dist\
+          if (-not (Get-ChildItem dist\*win_amd64.whl)) { throw "wheel tag mismatch" }
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-windows_amd64
+          path: dist/*.whl
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheel-*
+          merge-multiple: true
+
+      - name: List wheels
+        run: ls -l dist/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+          fail_on_unmatched_files: true
+          generate_release_notes: true

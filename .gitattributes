@@ -1,0 +1,13 @@
+# Treat bundled native binaries and wheels as binary: never apply text/EOL
+# normalization to them.
+*.so    binary
+*.so.*  binary
+*.dll   binary
+*.dylib binary
+*.pyd   binary
+*.whl   binary
+*.cdc   binary
+
+# Keep shell scripts LF so they run in Linux CI/containers regardless of the
+# checkout platform.
+*.sh    text eol=lf
