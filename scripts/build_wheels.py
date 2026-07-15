@@ -1,8 +1,8 @@
 """Build one platform-specific wheel per bundled native target.
 
 Each wheel must ship ONLY its own ``_native/<platform>`` subdirectory and carry
-the matching platform tag (``manylinux2014_x86_64`` / ``manylinux2014_aarch64`` /
-``win_amd64``) so pip installs the correct binaries. This script builds a pure
+the matching platform tag (``manylinux_2_34_x86_64`` / ``manylinux_2_34_aarch64``
+/ ``win_amd64``) so pip installs the correct binaries. This script builds a pure
 wheel with ``hatch``/``build`` for each platform whose binaries are present,
 temporarily hiding the other platforms' ``_native`` subdirs, then re-tags the
 wheel filename.
@@ -30,9 +30,9 @@ DIST = ROOT / "dist"
 
 # Map our _native platform dir -> the wheel platform tag.
 PLATFORM_TAGS = {
-    "linux_x86_64": "manylinux2014_x86_64",
-    "linux_aarch64": "manylinux2014_aarch64",
-    "linux_armhf": "manylinux2014_armv7l",
+    "linux_x86_64": "manylinux_2_34_x86_64",
+    "linux_aarch64": "manylinux_2_34_aarch64",
+    "linux_armhf": "manylinux_2_17_armv7l",
     "windows_amd64": "win_amd64",
 }
 

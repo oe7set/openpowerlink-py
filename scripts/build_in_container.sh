@@ -1,23 +1,33 @@
 #!/usr/bin/env bash
 #
 # Build oplkmn + oplkwrap for the CURRENT container's architecture and drop the
-# binaries into /out. Intended to run inside a manylinux2014 image (x86_64 or,
+# binaries into /out. Intended to run inside a manylinux_2_34 image (x86_64 or,
 # via QEMU, aarch64). Expects:
 #   /src   = the openPOWERLINK_V2 source tree (read-only ok, copied to /work)
 #   /pkg   = the openpowerlink-py repo (for the shim sources + patch scripts)
 #   /out   = where to place liboplkmn.so + liboplkwrap.so
 #
+# Why manylinux_2_34 (glibc 2.34) and NOT manylinux2014 (glibc 2.17): on glibc
+# 2.17 the POSIX interval-timer functions (timer_create/timer_settime) live in
+# librt, and the stack's CMake does not link -lrt, so they end up as UNVERSIONED
+# undefined symbols in liboplkmn.so. On a modern target (glibc >= 2.34, where
+# librt was folded into libc) those unversioned refs bind to the oldest compat
+# symbol, which does not drive SIGEV_SIGNAL timers -- so the high-resolution
+# timer never fires and the MN hangs in NMT PreOperational1. Building on glibc
+# 2.34 makes them resolve to timer_create@GLIBC_2.34 from libc, which works.
 set -euo pipefail
 
 ARCH="$(uname -m)"
 echo ">> Building for ${ARCH} in $(cat /etc/system-release 2>/dev/null || echo container)"
 
-# manylinux2014 now ships CMake 4.x, which drops policies the vendored stack
-# still sets (e.g. CMP0043 OLD). Install a compatible CMake 3.22 and use it.
+# The vendored stack sets CMake policy CMP0043 OLD, which CMake >= 4.0 rejects;
+# install a compatible CMake 3.22 and use it regardless of what the image ships.
 PYBIN=/opt/python/cp312-cp312/bin
 "$PYBIN/pip" install -q "cmake==3.22.6" 2>/dev/null || true
 export PATH="$PYBIN:$PATH"
-command -v patchelf >/dev/null || yum install -y patchelf >/dev/null 2>&1 || true
+# manylinux_2_34 is AlmaLinux 9 (dnf); fall back to yum for older images.
+command -v patchelf >/dev/null || dnf install -y patchelf >/dev/null 2>&1 || \
+    yum install -y patchelf >/dev/null 2>&1 || true
 echo ">> using cmake $(cmake --version | head -1)"
 
 WORK=/work

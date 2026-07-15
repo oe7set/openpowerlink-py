@@ -46,12 +46,12 @@ jobs:
           - arch: x86_64
             platform_tag: linux_x86_64
             docker_platform: linux/amd64
-            image: quay.io/pypa/manylinux2014_x86_64
+            image: quay.io/pypa/manylinux_2_34_x86_64
             qemu: false
           - arch: aarch64
             platform_tag: linux_aarch64
             docker_platform: linux/arm64
-            image: quay.io/pypa/manylinux2014_aarch64
+            image: quay.io/pypa/manylinux_2_34_aarch64
             qemu: true
     steps:
       - name: Checkout openpowerlink-py
@@ -75,7 +75,7 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build native binaries in manylinux2014
+      - name: Build native binaries in manylinux_2_34
         run: |
           mkdir -p out
           docker run --rm \
@@ -116,8 +116,8 @@ jobs:
         run: |
           ls -l dist/
           case "${{ matrix.platform_tag }}" in
-            linux_x86_64)  want=manylinux2014_x86_64 ;;
-            linux_aarch64) want=manylinux2014_aarch64 ;;
+            linux_x86_64)  want=manylinux_2_34_x86_64 ;;
+            linux_aarch64) want=manylinux_2_34_aarch64 ;;
           esac
           ls dist/openpowerlink-*-"$want".whl >/dev/null
 
