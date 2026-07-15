@@ -30,11 +30,43 @@
   static void plw_mutex_destroy(plw_mutex_t* m) { DeleteCriticalSection(m); }
 #else
   #include <pthread.h>
+  #include <signal.h>
   typedef pthread_mutex_t plw_mutex_t;
   static void plw_mutex_init(plw_mutex_t* m)    { pthread_mutex_init(m, NULL); }
   static void plw_mutex_lock(plw_mutex_t* m)    { pthread_mutex_lock(m); }
   static void plw_mutex_unlock(plw_mutex_t* m)  { pthread_mutex_unlock(m); }
   static void plw_mutex_destroy(plw_mutex_t* m) { pthread_mutex_destroy(m); }
+
+/*
+ * Block the real-time signals that openPOWERLINK's Linux timer modules use
+ * (hrestimer-posix: SIGRTMIN+1, timer-linuxuser: SIGRTMIN) in the CURRENT
+ * thread's signal mask before the stack starts.
+ *
+ * openPOWERLINK's target_init() blocks these signals, but only in the thread
+ * that calls it, relying on newly created threads inheriting the mask. That
+ * works for the console demo where main() runs target_init() before spawning
+ * anything. In this package the stack is embedded in-process: CPython's main
+ * thread (and its worker threads) are already running with these RT signals
+ * UNBLOCKED. The POSIX interval timers deliver a process-directed signal, which
+ * the kernel then hands to any thread not blocking it -- i.e. a Python thread,
+ * where it is discarded -- instead of waking the stack's dedicated sigwaitinfo
+ * timer threads. The high-resolution timer therefore never ticks, the MN never
+ * runs its (reduced) cycle, and it stays stuck in PreOperational1.
+ *
+ * Blocking them here, before oplk_create() spawns the stack threads, makes the
+ * stack threads inherit a mask with these signals blocked, so only the intended
+ * sigwaitinfo threads consume them. Must be called from the same (Python main)
+ * thread that goes on to drive the stack.
+ */
+static void plw_block_rt_timer_signals(void)
+{
+    sigset_t mask;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGRTMIN);
+    sigaddset(&mask, SIGRTMIN + 1);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
 #endif
 
 /* Default identity/timing, taken from the sibling daemon's init params. */
@@ -156,6 +188,15 @@ int plw_init(uint8_t nodeId, uint32_t cycleUs,
         mutexReady_l = 1;
     }
     memset((void*)&status_l, 0, sizeof(status_l));
+
+#if !defined(_WIN32)
+    /* Ensure the stack's RT timer signals are blocked in this (Python main)
+     * thread before oplk_create() spawns the timer threads, so those signals
+     * reach the stack's sigwaitinfo threads instead of being lost in Python.
+     * Without this the high-res timer never ticks and the MN hangs in
+     * PreOperational1. See plw_block_rt_timer_signals() for the full rationale. */
+    plw_block_rt_timer_signals();
+#endif
 
     strncpy(devName_l, devName ? devName : "", sizeof(devName_l) - 1);
     devName_l[sizeof(devName_l) - 1] = '\0';
