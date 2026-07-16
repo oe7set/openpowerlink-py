@@ -139,6 +139,35 @@ class PowerlinkStack:
                 break
             self._stop_evt.wait(self._process_interval)
 
+    def wait_operational(self, timeout: float = 30.0, poll: float = 0.1) -> bool:
+        """Block until the Managing Node reaches Operational, or time out.
+
+        The MN needs a few hundred milliseconds to a few seconds after
+        :meth:`start` to climb the NMT state machine to Operational
+        (``MsOperational``, raw code ``0x02FD``). Reading :meth:`status` or the
+        process image before then legitimately reports "not operational" even on
+        a perfectly healthy boot, so callers should gate on this method instead
+        of a fixed ``sleep``.
+
+        Returns ``True`` once the MN is Operational, or ``False`` if ``timeout``
+        seconds elapse first. Raises :class:`StackError` if the supervisor thread
+        has died (the stack is no longer processing). Note this waits for the
+        *Managing Node*; a controlled node reaching Operational is reported
+        separately via :attr:`Status.cn_operational`.
+        """
+        if not self._started:
+            raise StackError("wait_operational", -0x0001)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.status().flags & _wrap.FLAG_MN_OPERATIONAL:
+                return True
+            if self._thread is not None and not self._thread.is_alive():
+                # Supervisor exited (plw_check_stack() reported the kernel part
+                # dead) -> the stack will never reach Operational.
+                raise StackError("wait_operational", -0x0001)
+            time.sleep(poll)
+        return False
+
     def stop(self) -> None:
         """Stop the supervisor and shut the stack down (idempotent)."""
         self._stop_evt.set()

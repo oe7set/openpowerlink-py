@@ -30,8 +30,14 @@ echo ">> Building liboplkmn (SHARED, ${BUILD_TYPE}) in ${OPLK_BASE_DIR}"
 mkdir -p "${OPLK_BASE_DIR}/stack/build/linux"
 cd "${OPLK_BASE_DIR}/stack/build/linux"
 
+# -fno-strict-aliasing is REQUIRED on GCC >= 14: openPOWERLINK type-puns the raw
+# Ethernet frame buffers, and GCC 14's aggressive strict-aliasing at -O2
+# miscompiles the MN frame-RX / CN-discovery path (the MN reaches Operational
+# but never finds the CN). Harmless on GCC 13. See build_in_container.sh for the
+# full rationale (proven on real hardware).
 cmake ${POLICY_ARGS} \
       -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+      -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -fno-strict-aliasing" \
       -DCFG_COMPILE_LIB_MN=ON \
       -DCFG_COMPILE_LIB_CN=OFF \
       -DCFG_COMPILE_SHARED_LIBRARY=ON \

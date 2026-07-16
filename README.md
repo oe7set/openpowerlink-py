@@ -9,6 +9,12 @@ the wheel**. Install and run; nothing else to build or configure on the target
 from openpowerlink import PowerlinkStack, PowerlinkIO
 
 with PowerlinkStack(iface="eth0", cdc="mnobd.cdc", xap="xap.xml") as stack:
+    # The MN needs up to a few seconds to climb the NMT state machine to
+    # Operational. Gate on this instead of a fixed sleep — reading the process
+    # image before the MN is Operational legitimately returns zeros.
+    if not stack.wait_operational(timeout=10.0):
+        raise SystemExit("Managing Node did not reach Operational")
+
     io = PowerlinkIO(stack)
     io.write_do(0, True)              # set digital output 0
     io.write_ao_volts(1, 4.5)         # set analog output 1 to 4.5 V
@@ -17,6 +23,12 @@ with PowerlinkStack(iface="eth0", cdc="mnobd.cdc", xap="xap.xml") as stack:
     if not io.status().cn_operational:
         print("controlled node not operational!")
 ```
+
+> The MN reaching Operational and the *controlled node* reaching Operational are
+> two separate things: `wait_operational()` waits for the MN; the CN joining is
+> reported by `io.status().cn_operational`. A CN that never becomes operational
+> while the MN is healthy is a wiring / node-id / CDC issue on the CN side — see
+> **Troubleshooting** below.
 
 ## How it works
 
@@ -46,11 +58,11 @@ release asset directly (public repo — no token needed):
 ```bash
 # pick the line for your platform (bump the version to match the release tag)
 # Linux x86_64
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.4/openpowerlink-0.1.4-py3-none-manylinux_2_34_x86_64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-manylinux_2_34_x86_64.whl
 # Linux aarch64 (Raspberry Pi 4/5, Jetson, …)
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.4/openpowerlink-0.1.4-py3-none-manylinux_2_34_aarch64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-manylinux_2_34_aarch64.whl
 # Windows x86_64  (install Npcap first: https://npcap.com)
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.4/openpowerlink-0.1.4-py3-none-win_amd64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-win_amd64.whl
 ```
 
 Or grab the latest without hardcoding the version (needs the GitHub CLI):
@@ -100,6 +112,32 @@ owned by `root`, and a later unprivileged run cannot reopen or unlink them
   sudo rm -f /dev/shm/sem.semUserEvent /dev/shm/sem.semKernelEvent \
              /dev/shm/sem.semCircbuf-* /dev/shm/shmCircbuf-*
   ```
+
+### Troubleshooting: MN or CN not reaching Operational
+
+Two maintainer scripts under `scripts/` diagnose a stack that comes up but does
+not deliver data. Copy them next to your `mnobd.cdc` / `xap.xml` and run them
+with the same interface as your app. They need `cap_net_raw` on the interpreter
+(the raw-socket edrv and the sniffer both open `AF_PACKET`).
+
+* `scripts/diag.py <iface> [cdc] [xap] [seconds]` — starts the stack and prints a
+  timestamped NMT-state trace plus a verdict. Use it to confirm the **Managing
+  Node** reaches Operational and that the cycle counter advances.
+* `scripts/cndiag.py <iface> [cdc] [xap] [seconds]` — runs the MN *and* a
+  POWERLINK wire sniffer in one process; tells apart "the MN isn't transmitting",
+  "the **controlled node** is silent", and "the CN answers but with a different
+  node-id than the CDC expects".
+* `scripts/dump_cdc.py <mnobd.cdc>` — decodes the concise device configuration
+  and lists which node-ids are configured as pollable CNs (`0x1F81` with
+  `NODE_EXISTS | NODE_IS_CN`), so you can check the CDC node-id matches the
+  coupler's node-id switch.
+
+NMT state codes (raw `mn_nmt_state` / `cn_nmt_state`): the high byte is the role
+— `0x02xx` = MN, `0x01xx` = CN. The states to recognise: `0x021D`/`0x011D`
+PreOperational1, `0x025D`/`0x015D` PreOperational2, `0x02FD` MsOperational,
+`0x01FD` CsOperational. An MN parked at `0x021D` with `cycle_count == 0` means
+the isochronous cycle is not running; a CN stuck at `0x0000` while the MN is
+Operational means the coupler never joined.
 
 ## CLI
 

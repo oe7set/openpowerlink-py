@@ -41,8 +41,18 @@ if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
 fi
 
 # 1) stack (shared MN, raw-socket edrv, no pcap)
+#
+# -fno-strict-aliasing is REQUIRED: openPOWERLINK is old C (its CMake still sets
+# CMP0043 OLD) that type-puns the raw Ethernet frame buffers heavily. GCC >= 14
+# (shipped by the manylinux_2_34 / AlmaLinux 9 image) optimizes strict-aliasing
+# aggressively at -O2 and miscompiles the MN's frame RX / CN-discovery path, so
+# the built stack reaches MsOperational but never finds the controlled node (0
+# frames received back). Proven on real hardware: a GCC-13 build (Ubuntu 24.04)
+# brings the CN to CsOperational; the GCC-14 build with default flags does not.
+# Disabling strict aliasing restores the GCC-13 behaviour on GCC 14.
 mkdir -p "$OPLK/stack/build/linux"; cd "$OPLK/stack/build/linux"
 cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -fno-strict-aliasing" \
       -DCFG_COMPILE_LIB_MN=ON -DCFG_COMPILE_LIB_CN=OFF \
       -DCFG_COMPILE_SHARED_LIBRARY=ON -DCFG_USE_PCAP_EDRV=OFF ../..
 make oplkmn -j"$(nproc)"
