@@ -58,11 +58,11 @@ release asset directly (public repo — no token needed):
 ```bash
 # pick the line for your platform (bump the version to match the release tag)
 # Linux x86_64
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-manylinux_2_34_x86_64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.6/openpowerlink-0.1.6-py3-none-manylinux_2_34_x86_64.whl
 # Linux aarch64 (Raspberry Pi 4/5, Jetson, …)
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-manylinux_2_34_aarch64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.6/openpowerlink-0.1.6-py3-none-manylinux_2_34_aarch64.whl
 # Windows x86_64  (install Npcap first: https://npcap.com)
-pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.5/openpowerlink-0.1.5-py3-none-win_amd64.whl
+pip install https://github.com/oe7set/openpowerlink-py/releases/download/v0.1.6/openpowerlink-0.1.6-py3-none-win_amd64.whl
 ```
 
 Or grab the latest without hardcoding the version (needs the GitHub CLI):

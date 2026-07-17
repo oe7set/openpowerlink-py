@@ -46,12 +46,12 @@ jobs:
           - arch: x86_64
             platform_tag: linux_x86_64
             docker_platform: linux/amd64
-            image: quay.io/pypa/manylinux_2_34_x86_64
+            image: ubuntu:22.04
             qemu: false
           - arch: aarch64
             platform_tag: linux_aarch64
             docker_platform: linux/arm64
-            image: quay.io/pypa/manylinux_2_34_aarch64
+            image: ubuntu:22.04
             qemu: true
     steps:
       - name: Checkout openpowerlink-py
@@ -66,7 +66,7 @@ jobs:
           ref: ${{ env.OPLK_REF }}
           path: openPOWERLINK_V2
 
-      # aarch64 is built in an arm64 manylinux image under QEMU emulation.
+      # aarch64 is built in an arm64 ubuntu:22.04 image under QEMU emulation.
       # (If native ARM runners become available, switch runs-on to ubuntu-24.04-arm
       #  and drop this step for a large speedup.)
       - name: Set up QEMU (arm64 only)
@@ -75,7 +75,7 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build native binaries in manylinux_2_34
+      - name: Build native binaries in ubuntu:22.04
         run: |
           mkdir -p out
           docker run --rm \
